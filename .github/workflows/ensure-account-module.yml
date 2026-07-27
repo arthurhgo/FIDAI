@@ -1,0 +1,51 @@
+name: Ensure FIDAI account manager
+
+on:
+  push:
+    branches:
+      - main
+      - agent/alinhar-pedidos-pix-admin
+    paths:
+      - assets/fidai-account.js
+      - .github/workflows/ensure-account-module.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  inject-account-module:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Load account manager in the site
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('index.html')
+          html = path.read_text(encoding='utf-8')
+          account_tag = '<script defer src="./assets/fidai-account.js"></script>'
+          orders_tag = '<script defer src="./assets/fidai-orders.js"></script>'
+
+          if account_tag not in html:
+              if orders_tag in html:
+                  html = html.replace(orders_tag, f'{account_tag}{orders_tag}')
+              else:
+                  html = html.replace('</body>', f'{account_tag}</body>')
+              path.write_text(html, encoding='utf-8')
+          PY
+
+      - name: Commit generated index
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Load FIDAI account manager"
+          git push origin HEAD:${{ github.ref_name }}
