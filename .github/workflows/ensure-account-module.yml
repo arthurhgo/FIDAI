@@ -1,4 +1,4 @@
-name: Ensure FIDAI account manager
+name: Ensure FIDAI account and auth modules
 
 on:
   push:
@@ -7,6 +7,7 @@ on:
       - agent/alinhar-pedidos-pix-admin
     paths:
       - assets/fidai-account.js
+      - assets/fidai-auth-redirect.js
       - .github/workflows/ensure-account-module.yml
   workflow_dispatch:
 
@@ -21,22 +22,27 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
 
-      - name: Load account manager in the site
+      - name: Load auth redirect and account manager in the site
         run: |
           python - <<'PY'
           from pathlib import Path
 
           path = Path('index.html')
           html = path.read_text(encoding='utf-8')
+          auth_tag = '<script defer src="./assets/fidai-auth-redirect.js"></script>'
           account_tag = '<script defer src="./assets/fidai-account.js"></script>'
           orders_tag = '<script defer src="./assets/fidai-orders.js"></script>'
 
-          if account_tag not in html:
+          tags = [auth_tag, account_tag]
+          for tag in tags:
+              if tag in html:
+                  continue
               if orders_tag in html:
-                  html = html.replace(orders_tag, f'{account_tag}{orders_tag}')
+                  html = html.replace(orders_tag, f'{tag}{orders_tag}')
               else:
-                  html = html.replace('</body>', f'{account_tag}</body>')
-              path.write_text(html, encoding='utf-8')
+                  html = html.replace('</body>', f'{tag}</body>')
+
+          path.write_text(html, encoding='utf-8')
           PY
 
       - name: Commit generated index
@@ -47,5 +53,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Load FIDAI account manager"
+          git commit -m "Load FIDAI auth and account modules"
           git push origin HEAD:${{ github.ref_name }}
